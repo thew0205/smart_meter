@@ -15,7 +15,7 @@
 #include "rtc.h"
 #include "pzem004t.h"
 
-#define METER_TO_JSON_FORMAT ("\n=BEGIN={\"voltage\":%0.4f,\"current\": %0.4f,\"power\": %0.4f,\"energy\": %0.4f,\"freq\": %0.4f,\"pf\": %0.4f,\"timestamp\": %s}==END==\n")
+#define METER_TO_JSON_FORMAT ("\n=BEGIN={\"voltage\":%0.4f,\"current\": %0.4f,\"power\": %0.4f,\"energy\": %0.4f,\"freq\": %0.4f,\"pf\": %0.4f,\"timestamp\": \"%s\"}==END==\n")
 using std::string;
 
 // Start blink task
@@ -42,7 +42,11 @@ void sensorTask(void *para)
         datetime_t dt;
         IAQ_RTC::get_time(&dt);
         char time_buffer[100];
-        datetime_to_str(time_buffer, sizeof(time_buffer), &dt);
+
+        snprintf(time_buffer,
+                 sizeof(time_buffer),
+                 "%02d:%02d:%02d-%02d:%02d:%04d",
+                 dt.hour, dt.min, dt.sec, dt.day, dt.month, dt.year);
 
         if (!meter.updateValues(&data))
         {
@@ -80,7 +84,7 @@ void storageTask(void *para)
         datetime_t dt;
         IAQ_RTC::get_time(&dt);
         char file_name_buffer[60];
-        snprintf(file_name_buffer, sizeof(file_name_buffer), "/sd0/meter_data_%d-%d-%d.json", dt.year, dt.month, dt.day);
+        snprintf(file_name_buffer, sizeof(file_name_buffer), "/sd0/meter_data_%02d-%02d-%04d.json", dt.day, dt.month, dt.year);
         FF_FILE *file = fat_sd_card_open(file_name_buffer, "a");
         fat_sd_card_write(data_str_p->c_str(), data_str_p->length(), file);
         fat_sd_card_close(file);
