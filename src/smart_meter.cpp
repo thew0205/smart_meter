@@ -15,7 +15,7 @@
 #include "rtc.h"
 #include "pzem004t.h"
 
-#define METER_TO_JSON_FORMAT ("\n=BEGIN={\"voltage\":%0.4f,\"current\": %0.4f,\"power\": %0.4f,\"energy\": %0.4f,\"freq\": %0.4f,\"pf\": %0.4f,\"timestamp\": \"%s\"}==END==\n")
+#define METER_TO_JSON_FORMAT ("\n=BEGIN={\"voltage\":%0.4f,\"current\": %0.4f,\"power\": %0.4f,\"energy\": %0.4f,\"freq\": %0.4f,\"pf\": %0.4f,\"timestamp\": \"%02d:%02d:%02d-%02d:%02d:%04d\"}==END==\n")
 using std::string;
 
 // Start blink task
@@ -34,19 +34,14 @@ void sensorTask(void *para)
     meter.init(8, 9, 9600);
     printf("\nSystem Ready.\n\n");
     TickType_t xLastWakeTime = xTaskGetTickCount();
+
+    PZEM004Tv30Data previousData;
+
     while (true)
     {
         memcpy_unique_ptr<string> data_str_p = make_memcpy_unique_ptr<string>("");
 
         PZEM004Tv30Data data;
-        datetime_t dt;
-        IAQ_RTC::get_time(&dt);
-        char time_buffer[100];
-
-        snprintf(time_buffer,
-                 sizeof(time_buffer),
-                 "%02d:%02d:%02d-%02d:%02d:%04d",
-                 dt.hour, dt.min, dt.sec, dt.day, dt.month, dt.year);
 
         if (!meter.updateValues(&data))
         {
@@ -56,13 +51,20 @@ void sensorTask(void *para)
             data.freq = 0.0f;
             data.pf = 0.0f;
             // Set data to last value as it is monotonically increasing.
-            data.energy = data.energy;
+            data.energy = previousData.energy;
+        }
+        else
+        {
+            previousData = data;
         }
 
-        int needed_size = sprintf(nullptr, METER_TO_JSON_FORMAT, data.voltage, data.current, data.power, data.energy, data.freq, data.pf, time_buffer);
+        datetime_t dt;
+        IAQ_RTC::get_time(&dt);
+
+        int needed_size = sprintf(nullptr, METER_TO_JSON_FORMAT, data.voltage, data.current, data.power, data.energy, data.freq, data.pf, dt.hour, dt.min, dt.sec, dt.day, dt.month, dt.year);
 
         data_str_p->resize(needed_size + 1);
-        sprintf(data_str_p->data(), METER_TO_JSON_FORMAT, data.voltage, data.current, data.power, data.energy, data.freq, data.pf, time_buffer);
+        sprintf(data_str_p->data(), METER_TO_JSON_FORMAT, data.voltage, data.current, data.power, data.energy, data.freq, data.pf, dt.hour, dt.min, dt.sec, dt.day, dt.month, dt.year);
 
         printf("%s\n", data_str_p->data());
         data_str_p.memcpy_send(nullptr, [](void *, const memcpy_unique_ptr<string> *src)
