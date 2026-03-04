@@ -15,7 +15,7 @@
 #include "rtc.h"
 #include "pzem004t.h"
 
-#define METER_TO_JSON_FORMAT ("\n=BEGIN={\"voltage\":%0.4f,\"current\": %0.4f,\"power\": %0.4f,\"energy\": %0.4f,\"freq\": %0.4f,\"pf\": %0.4f,\"timestamp\": \"%02d:%02d:%02d-%02d:%02d:%04d\"}==END==\n")
+#define METER_TO_JSON_FORMAT ("\n=BEGIN={\"voltage\":%0.4f,\"current\": %0.4f,\"power\": %0.4f,\"energy\": %0.4f,\"freq\": %0.4f,\"pf\": %0.4f,\"timestamp\": \"%04d-%02d-%02dT%02d:%02d:%02d\"}==END==\n")
 using std::string;
 
 // Start blink task
@@ -61,10 +61,10 @@ void sensorTask(void *para)
         datetime_t dt;
         IAQ_RTC::get_time(&dt);
 
-        int needed_size = sprintf(nullptr, METER_TO_JSON_FORMAT, data.voltage, data.current, data.power, data.energy, data.freq, data.pf, dt.hour, dt.min, dt.sec, dt.day, dt.month, dt.year);
+        int needed_size = sprintf(nullptr, METER_TO_JSON_FORMAT, data.voltage, data.current, data.power, data.energy, data.freq, data.pf, dt.year, dt.month, dt.day, dt.hour, dt.min, dt.sec);
 
         data_str_p->resize(needed_size + 1);
-        sprintf(data_str_p->data(), METER_TO_JSON_FORMAT, data.voltage, data.current, data.power, data.energy, data.freq, data.pf, dt.hour, dt.min, dt.sec, dt.day, dt.month, dt.year);
+        sprintf(data_str_p->data(), METER_TO_JSON_FORMAT, data.voltage, data.current, data.power, data.energy, data.freq, data.pf, dt.year, dt.month, dt.day, dt.hour, dt.min, dt.sec);
 
         printf("%s\n", data_str_p->data());
         data_str_p.memcpy_send(nullptr, [](void *, const memcpy_unique_ptr<string> *src)
@@ -86,7 +86,7 @@ void storageTask(void *para)
         datetime_t dt;
         IAQ_RTC::get_time(&dt);
         char file_name_buffer[60];
-        snprintf(file_name_buffer, sizeof(file_name_buffer), "/sd0/meter_data_%02d-%02d-%04d.json", dt.day, dt.month, dt.year);
+        snprintf(file_name_buffer, sizeof(file_name_buffer), "/sd0/meter_data_%04d-%02d-%02d.json", dt.year, dt.month, dt.day);
         FF_FILE *file = fat_sd_card_open(file_name_buffer, "a");
         fat_sd_card_write(data_str_p->c_str(), data_str_p->length(), file);
         fat_sd_card_close(file);
