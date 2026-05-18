@@ -1,0 +1,89 @@
+/ {
+	aliases {
+		modbus0 = &modbus0;
+	};
+};
+
+&uart1 {
+	status = "okay";
+	current-speed = <9600>;
+	modbus0: modbus0 {
+		compatible = "zephyr,modbus-serial";
+		status = "okay";
+		de-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;	/* D9 */
+
+		pzem: pzem004t {
+			compatible = "peacefair,pzem004t";
+			status = "okay";
+			label = "PZEM004T";
+		};
+	};
+};
+
+&pinctrl {
+	spi0_sdcard_pin: spi0_sdcard_pin {
+		group1 {
+			pinmux = <SPI0_CSN_P5>, <SPI0_SCK_P2>, <SPI0_TX_P3>;
+		};
+
+		group2 {
+			pinmux = <SPI0_RX_P4>;
+			input-enable;
+		};
+	};
+
+	i2c1_default: i2c1_default {
+		group1 {
+			pinmux = <I2C1_SDA_P6>, <I2C1_SCL_P7>;
+			input-enable;
+			input-schmitt-enable;
+		};
+	};
+};
+
+
+&spi0{
+	status = "okay";
+	pinctrl-0 = <&spi0_sdcard_pin>;
+	pinctrl-names = "default";
+	// Check if active low or high
+	cs-gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
+
+	sdhc0: sdhc@0 {
+		compatible = "zephyr,sdhc-spi-slot";
+		reg = <0>;
+		status = "okay";
+		label = "SDHC_0";
+		mmc {
+			compatible = "zephyr,sdmmc-disk";
+			status = "okay";
+			disk-name = "SDHC_0";
+		};
+		spi-max-frequency = <8000000>;
+	};
+};
+
+
+&i2c1 {
+	status = "okay";
+	pinctrl-0 = <&i2c1_default>;
+	pinctrl-names = "default";
+
+	ds3231: ds3231@68 {
+		compatible = "maxim,ds3231-mfd";
+		reg = <0x68>;
+		status = "okay";
+
+		ds3231_sensor: ds3231_sensor {
+			compatible = "maxim,ds3231-sensor";
+			status = "okay";
+		};
+
+		ds3231_rtc: ds3231_rtc {
+			compatible = "maxim,ds3231-rtc";
+			status = "okay";
+			isw-gpios = <&gpio0 25 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			// freq-32khz-gpios = <&gpio0 33 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+		};
+	};
+};

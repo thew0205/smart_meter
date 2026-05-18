@@ -1,0 +1,20 @@
+manifest:
+  # lowest version of the manifest file schema that can parse this file’s data
+  version: 1.2
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v4.3.0
+      import:
+        path-prefix: third_party
+        file: west.yml
+        name-allowlist:
+          - cmsis
+          - cmsis_6
+          - hal_rpi_pico
+          - fatfs
+  self:
+    path: smart_meter
