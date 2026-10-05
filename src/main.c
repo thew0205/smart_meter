@@ -1,3 +1,4 @@
+#include "zephyr/logging/log_core.h"
 #include <stdio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
@@ -11,12 +12,14 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/drivers/sensor/pzem004t.h>
+#include <zephyr/storage/disk_access.h>
+
 
 #define METER_TO_JSON_FORMAT ("\n=BEGIN={\"voltage\":%0.4f,\"current\": %0.4f,\"power\": %0.4f,\"energy\": %0.4f,\"freq\": %0.4f,\"pf\": %0.4f,\"timestamp\": \"%04d-%02d-%02dT%02d:%02d:%02d\"}==END==\n")
 
 const struct device *const rtc = DEVICE_DT_GET(DT_NODELABEL(ds3231_rtc));
 
-LOG_MODULE_REGISTER(smart_meter, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(smart_meter, LOG_LEVEL_INF);
 
 /* 1000 msec = 1 sec */
 #define SLEEP_TIME_MS 1000
@@ -38,12 +41,12 @@ static struct fs_mount_t mp = {
  *  Note the fatfs library is able to mount only strings inside _VOLUME_STRS
  *  in ffconf.h
  */
-static const char *disk_mount_pt = "/SD:";
+static const char *disk_mount_pt = "/sd0:";
 
 static int mount_sd_card(void)
 {
 	/* raw disk i/o */
-	static const char *disk_pdrv = "SD";
+	static const char *disk_pdrv = "sd0";
 	uint64_t memory_size_mb;
 	uint32_t block_count;
 	uint32_t block_size;
@@ -104,11 +107,11 @@ int main(void)
 	int ret;
 	bool led_state = true;
 
-	if (!device_is_ready(pzem))
-	{
-		LOG_ERR("pzem device not ready.\n");
-		return 0;
-	}
+	// if (!device_is_ready(pzem))
+	// {
+	// 	LOG_ERR("pzem device not ready.\n");
+	// 	return 0;
+	// }
 	/* Check if the RTC is ready */
 	if (!device_is_ready(rtc))
 	{
@@ -134,18 +137,17 @@ int main(void)
 	{
 		LOG_INF("Successfully mounted SD card\n");
 	}
-
 #ifdef SET_RTC_TIME_FROM_MACHINE
-	const struct rtc_time tm = {
-		.tm_year = 2024 - 1900,
-		.tm_mon = 11 - 1,
-		.tm_mday = 17,
-		.tm_hour = 4,
-		.tm_min = 19,
+	const struct rtc_time tms = {
+		.tm_year = 2026 - 1900,
+		.tm_mon = 5 - 1,
+		.tm_mday = 24,
+		.tm_hour = 13,
+		.tm_min = 3,
 		.tm_sec = 0,
 	};
 
-	set_date_time(rtc, tm);
+	set_date_time(rtc, tms);
 #endif
 
 	struct sensor_value voltage;
@@ -164,35 +166,35 @@ int main(void)
 		if (ret)
 		{
 			LOG_WRN("sensor_sample_fetch failed ret %d\n", ret);
-			continue;
+			// continue;
 		}
 
 		ret = get_date_time(rtc, &tm);
 		if (ret)
 		{
 			LOG_WRN("Reading rtc time failed ret %d\n", ret);
-			continue;
+			// continue;
 		}
 
 		ret = sensor_channel_get(pzem, SENSOR_CHAN_VOLTAGE, &voltage);
 		ret = sensor_channel_get(pzem, SENSOR_CHAN_CURRENT, &current);
 		ret = sensor_channel_get(pzem, SENSOR_CHAN_POWER, &power);
 		ret = sensor_channel_get(pzem, SENSOR_CHAN_FREQUENCY, &frequency);
-		ret = sensor_channel_get(pzem, SENSOR_CHAN_PZEM004T_ENERGY, &power);
+		ret = sensor_channel_get(pzem, SENSOR_CHAN_PZEM004T_ENERGY, &energy);
 		ret = sensor_channel_get(pzem, SENSOR_CHAN_PZEM004T_POWER_FACTOR, &power_factor);
-		int needed_size = snprintf(logging_buffer, 1000, METER_TO_JSON_FORMAT, sensor_value_to_float(&voltage), sensor_value_to_float(&current), sensor_value_to_float(&power), sensor_value_to_float(&energy), sensor_value_to_float(&frequency), sensor_value_to_float(&power_factor), tm.tm_year, tm.tm_mon, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		int needed_size = snprintf(logging_buffer, 1000, METER_TO_JSON_FORMAT, (double)sensor_value_to_float(&voltage), (double)sensor_value_to_float(&current), (double)sensor_value_to_float(&power), (double)sensor_value_to_float(&energy), (double)sensor_value_to_float(&frequency), (double)sensor_value_to_float(&power_factor), tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 		char file_name_buffer[60];
-		snprintf(file_name_buffer, sizeof(file_name_buffer), "/sd0/meter_data_%04d-%02d-%02d.json", tm.tm_year, tm.tm_mon, tm.tm_mday);
+		snprintf(file_name_buffer, sizeof(file_name_buffer), "/sd0:/meter_data_%04d-%02d-%02d.json", tm.tm_year, tm.tm_mon, tm.tm_mday);
 
 		struct fs_file_t data_filp;
 		fs_file_t_init(&data_filp);
 
-		ret = fs_open(&data_filp, file_name_buffer, FS_O_APPEND | FS_O_CREATE);
+		ret = fs_open(&data_filp, file_name_buffer, FS_O_WRITE | FS_O_CREATE | FS_O_APPEND);
 		if (ret)
 		{
 			LOG_ERR("%s -- failed to create file (err = %d)\n", __func__, ret);
-			continue;
+			goto file_close;
 		}
 		else
 		{
@@ -203,8 +205,9 @@ int main(void)
 		if (ret < 0)
 		{
 			LOG_ERR("%s -- failed to write to file (err = %d)\n", __func__, ret);
-			continue;
+			goto file_close;
 		}
+file_close:
 		fs_close(&data_filp);
 		k_sleep(K_MSEC(10000));
 	}

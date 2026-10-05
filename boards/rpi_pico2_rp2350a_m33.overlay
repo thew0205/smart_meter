@@ -23,7 +23,7 @@
 &pinctrl {
 	spi0_sdcard_pin: spi0_sdcard_pin {
 		group1 {
-			pinmux = <SPI0_CSN_P5>, <SPI0_SCK_P2>, <SPI0_TX_P3>;
+			pinmux = <SPI0_SCK_P2>, <SPI0_TX_P3>;
 		};
 
 		group2 {
@@ -39,6 +39,28 @@
 			input-schmitt-enable;
 		};
 	};
+	uart0_default: uart0_default {
+		group1 {
+			pinmux = <UART0_TX_P0>;
+		};
+
+		group2 {
+			pinmux = <UART0_RX_P1>;
+			input-enable;
+		};
+	};
+
+	uart1_default: uart1_default {
+		group1 {
+			pinmux = <UART1_TX_P8>;
+		};
+
+		group2 {
+			pinmux = <UART1_RX_P9>;
+			input-enable;
+		};
+	};
+
 };
 
 
@@ -53,13 +75,13 @@
 		compatible = "zephyr,sdhc-spi-slot";
 		reg = <0>;
 		status = "okay";
-		label = "SDHC_0";
+		label = "sd0";
 		mmc {
 			compatible = "zephyr,sdmmc-disk";
 			status = "okay";
-			disk-name = "SDHC_0";
+			disk-name = "sd0";
 		};
-		spi-max-frequency = <8000000>;
+		spi-max-frequency = <1000000>;
 	};
 };
 
